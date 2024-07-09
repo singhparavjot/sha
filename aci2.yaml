@@ -1,1 +1,27 @@
-
+apiVersion: '2019-12-01'
+location: eastus
+name: azdevops-agent-container-group
+properties:
+  containers:
+  - name: azdevops-agent
+    properties:
+      image: #{ACR_NAME}#.azurecr.io/azdevops-agent:latest
+      resources:
+        requests:
+          cpu: 1
+          memoryInGB: 2
+      environmentVariables:
+      - name: AZP_URL
+        value: 'https://dev.azure.com/YourOrganization'
+      - name: AZP_TOKEN
+        secureValue: #{PAT_TOKEN}#
+      - name: AZP_AGENT_NAME
+        value: #{AGENT_NAME}#
+  osType: Linux
+  restartPolicy: Always
+  imageRegistryCredentials:
+  - server: #{ACR_NAME}#.azurecr.io
+    username: #{ACR_USERNAME}#
+    password: #{ACR_PASSWORD}#
+tags: {}
+type: Microsoft.ContainerInstance/containerGroups
