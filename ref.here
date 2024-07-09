@@ -1,0 +1,65 @@
+trigger:
+- main
+
+variables:
+- group: MyVariableGroup  # This should contain PAT_TOKEN and AGENT_NAME
+
+stages:
+- stage: CreateACR
+  jobs:
+  - job: CreateAzureContainerRegistry
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: AzureCLI@2
+      inputs:
+        azureSubscription: 'Your-Azure-Subscription'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          az acr create --resource-group YourResourceGroup --name YourACRName --sku Basic
+
+- stage: BuildAndPushDockerImage
+  dependsOn: CreateACR
+  jobs:
+  - job: BuildPushImage
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: Docker@2
+      inputs:
+        containerRegistry: 'Your-ACR-Service-Connection'
+        repository: 'azdevops-agent'
+        command: 'buildAndPush'
+        Dockerfile: '**/Dockerfile'
+        tags: |
+          $(Build.BuildId)
+          latest
+
+- stage: DeploySelfHostedAgent
+  dependsOn: BuildAndPushDockerImage
+  jobs:
+  - job: DeployAgent
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: AzureCLI@2
+      inputs:
+        azureSubscription: 'Your-Azure-Subscription'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          # Get ACR credentials
+          ACR_NAME=YourACRName
+          ACR_USERNAME=$(az acr credential show -n $ACR_NAME --query "username" -o tsv)
+          ACR_PASSWORD=$(az acr credential show -n $ACR_NAME --query "passwords[0].value" -o tsv)
+          
+          # Replace placeholders in the YAML file
+          sed -i 's/#{ACR_NAME}#/'$ACR_NAME'/g' aci-deployment.yaml
+          sed -i 's/#{ACR_USERNAME}#/'$ACR_USERNAME'/g' aci-deployment.yaml
+          sed -i 's/#{ACR_PASSWORD}#/'$ACR_PASSWORD'/g' aci-deployment.yaml
+          sed -i 's/#{PAT_TOKEN}#/'$(PAT_TOKEN)'/g' aci-deployment.yaml
+          sed -i 's/#{AGENT_NAME}#/'$(AGENT_NAME)'/g' aci-deployment.yaml
+          
+          # Deploy ACI
+          az container create --resource-group YourResourceGroup --file aci-deployment.yaml
