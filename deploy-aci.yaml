@@ -1,0 +1,27 @@
+apiVersion: '2018-10-01'
+location: eastus
+name: mycontainergroup
+properties:
+  containers:
+  - name: mycontainer
+    properties:
+      image: $(acrName).azurecr.io/$(imageName):$(Build.BuildId)
+      environmentVariables:
+        - name: AZP_URL
+          value: 'https://dev.azure.com/yourOrg'
+        - name: AZP_TOKEN
+          value: $(patToken)
+        - name: AZP_AGENT_NAME
+          value: $(agentName)
+      resources:
+        requests:
+          cpu: 1
+          memoryInGb: 1.5
+  osType: Linux
+  restartPolicy: Always
+  ipAddress:
+    ports:
+    - protocol: tcp
+      port: 80
+    type: Public
+  type: Microsoft.ContainerInstance/containerGroups
